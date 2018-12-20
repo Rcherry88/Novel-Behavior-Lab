@@ -1,0 +1,316 @@
+#include "sensors.h"
+// The sensors.h library is included to provide crucial data about the sensors to other methods within the code
+int check_escape_conditions();
+int check_avoid_conditions();
+int check_seekcolor_blue_conditions();
+int check_seekcolor_pink_conditions();
+void seekcolor_blue();
+void seekcolor_pink();
+void escape();
+void avoid();
+void check_centered_blue();
+void straight_cruise();
+void pick_up();
+void return_nest();
+void stop();
+void drive(float left, float right, float delay_seconds);
+//The code above gives definitions to each method executed within the code
+const int FRONT_BUMP = 0;
+const int BACK_BUMP = 1;//15;
+const int LEFT_IR = 2;
+const int RIGHT_IR = 3;
+const int LEFT_MOTOR = 0;
+const int RIGHT_MOTOR = 3;
+const int GRIPPER_MOTOR = 2;
+
+
+const int BLUE_CH = 0;
+const int PINK_CH = 1;
+const int GREEN_CH = 2;
+const int YELLOW_CH = 3;
+
+
+
+const float SERVO_MAX = 2047.0;
+const float TOP_SPEED = 1023.0;
+//The code above defines multiple different constants which will be used later within the code
+int const true = 1;
+int const false = 0;
+//These two constants serve as boolean values and must be utilized because booleans are not natively supported in C
+int main() {
+	// The main function constantly loops itself, checking the conditions of the environment and activating a behavior if its specific cirteira are met
+int i;
+	enable_servos();
+	camera_open();
+	msleep(1500);
+	//The servos are enabled and the camera are opened before the while loop begins to ensure they are both ready to operate as the behavior
+  initiates itself. The msleep method allows the robot more time to be able to open up the camera before subsequent behaviors begin.
+	
+	while(1){ 
+		
+		camera_update();
+    // The camera-update function causes the camera to update the scene that it is processing.
+    // This is achieved by capturing the most recent camera frame for analysis.
+		
+		if(check_escape_conditions()){
+				escape();
+			}
+    
+		else if(check_seekcolor_blue_conditions()){
+					//seekcolor_blue();
+					check_centered_blue();
+			}
+		else if(check_seekcolor_pink_conditions()){
+					seekcolor_pink();
+					//check_centered_pink();
+					
+			}
+		
+		else if(check_avoid_conditions()){
+			printf("avoid\n");
+			avoid();
+		}
+		
+		else{straight_cruise();
+			printf("cruising\n");}
+		
+	} 
+  // The hierarchy is set up in descending level of priority with check escape conditions being the highest and straight_cruise
+  // being the lowest.  The hierarchy is designed to allow the robot to avoid and escape objects while cruising in the environment until it
+  sees a colored object and picks it up.
+return 0;
+}
+/******************************************************/
+int check_escape_conditions(){
+	int bump_threshold = 0;
+	int bump_max = 400;
+	int front_bump_value = analog10(FRONT_BUMP);
+	
+	if(front_bump_value >= bump_threshold && front_bump_value <= bump_max){
+		return true;
+	}else{
+		return false;
+	}
+}
+// check_escape_conditions checks to see if the value from the front bump sensor is inbetween the bump__threshold and the bump_max
+// returning true if the conditions are met and the escape behavior must be activated.
+/******************************************************/
+void escape(){
+	int bump_threshold = 250;
+	int bump_max = 400;
+	int front_bump_value = analog10(FRONT_BUMP);
+	//printf("EscapeFrontBump()\n");
+	if(front_bump_value < bump_threshold){
+		//drive(-0.25, 0.75, 0.50);
+		drive(-0.0, -0.90, 0.50);
+		//printf("drive(-0.25, -0.75, 1.5);\n");
+	}
+	else if(front_bump_value >= bump_threshold && front_bump_value <= bump_max){
+		//drive(0.75, -0.25, 0.50);
+		drive(-0.90, -0.0, 0.50);
+		//printf("drive(-0.75, -0.25, 1.5);\n");
+	}
+
+}
+// The escape function utilizes inforrmation from the front bump sensor drving backwards from the object depending on the front_bump_values
+// relation to the bump_threshold and bump_max values
+/******************************************************/
+int check_seekcolor_blue_conditions(){
+	if (get_object_count(0) > 0){
+		printf("I see blue");
+		return true;
+	}else{
+		return false;
+	}
+	
+}
+// The check_seekvolor_blue_conditions method returns true if the camera counts a number of objects greater than 0 within color channel
+// 0. The method also prints "I see blue" to give more information to the programmer.
+/******************************************************/
+int check_seekcolor_pink_conditions(){
+	camera_open();
+	camera_update();
+	if (get_object_count(1) > 0){
+	printf("I see pink");
+	return true;
+	}else{
+		return false;
+		}
+	
+}
+// The check_seekcolor_pink_conditions method returns true if the camera counts a number of objects greater than 0 within color channel
+// 1. The method also prints "I see pink" to give more information to the programmer.
+/******************************************************/
+void seekcolor_blue(){
+	if(get_object_center(0,0).x<100) {
+	 drive(-0.02, 0.02, 0.0001 );
+		printf("Turning Right\n");
+	}
+	else if(get_object_center(0,0).x>155) {
+		drive(0.02, -.02, 0.0001);
+		printf("Turning Left\n");
+	}
+	else{
+		drive(-0.20, -0.20, 0.0001);
+		printf("Driving Straight\n");
+	}	
+}
+// The seekcolor_blue method is designed to center a blue object within the robots FOV. To achieve this the robot turns to the right if the object is 
+// to the left and vice versa if the object is to the right. If the object is within the range defined as centered then the robot drives straight.
+//The ideal range and values for the drive function and the get_object center function were determined through trial and error.
+/******************************************************/
+void check_centered_blue(){
+	int blue_y = get_object_center(0, 0).y;
+	int blue_x = get_object_center(0, 0).x;
+	printf("blue (x, y) : (%d, %d)\n", blue_x, blue_y);
+	if ((blue_x>=100 && blue_x<=155) && (blue_y>=95 && blue_y<=120)) {
+		drive(0.0, 0.0, 0.25);
+		printf("In position\n");
+		drive(-.40,-.40, 0.5);
+		pick_up();
+	}
+	else {
+		printf("Not in position\n");
+		seekcolor_blue();
+	}
+		
+}
+// The check_centered_blue method is designed to print out the x and y coordinates of the blue object in the 
+//and then stop if those coordiantes fall within a certain range. Once it stops the robot will print in osition and then proceed to
+//drive forward a short distance. The method will then call the pick)up method to operate the servo controlling the gripper and pick up 
+// the object
+/******************************************************/
+void seekcolor_pink(){
+	camera_open();
+	camera_update();
+if(get_object_center(1,0).x<55) {
+ drive(-0.5, 0.5, 0.6);
+}
+else { if(get_object_center(1,0).x>95) {
+ drive(0.5, -0.5, 0.6);
+}
+else drive(0.40, 0.40, 0.5);}
+}
+	// The seekcolor_pink method is designed to center a pink object within the robots FOV. To achieve this the robot turns to the right if the object is 
+// to the left and vice versa if the object is to the right. If the object is within the range defined as centered then the robot drives straight.
+//The ideal range of the centering and values for the drive function were determined through trial and error.
+/******************************************************/
+
+
+
+int check_avoid_conditions(){
+	int left_ir_value;
+	int right_ir_value;
+	
+	left_ir_value = analog_et(LEFT_IR);
+	right_ir_value = analog_et(RIGHT_IR);
+	
+	if(left_ir_value > avoid_threshold || right_ir_value > avoid_threshold){
+		return true;
+	}else{
+		return false;
+	}
+}
+// The check_avoid_conditions method checks to see if either the left or right values from the ir sensors exceeds the avoid_threshold defined
+// in the sensors.h library. If this is the case the method will return true and the avoid behavior will be called. If this is not the case
+then the method will return false and the robot will proceed with the next step of the main function.
+
+/******************************************************/
+void pick_up(){
+	printf("Picking Up\n");
+	// drive(0.0, 0.0, 0.5);
+	enable_servo(GRIPPER_MOTOR);
+	set_servo_position(GRIPPER_MOTOR, 0);
+	msleep(500);
+	disable_servos();
+	enable_servo(GRIPPER_MOTOR);
+	set_servo_position(GRIPPER_MOTOR,400);
+	msleep(200);
+	enable_servo(LEFT_MOTOR);
+	enable_servo(RIGHT_MOTOR);
+	drive(-0.1,-0.1 ,2);
+	set_servo_position(GRIPPER_MOTOR,800);
+	msleep(200);
+	disable_servos();
+	//1qenable_servos();
+}
+// The pick_up_method enables the servo connected to the gripper motor and sets the servo position to 0 which opens the gripper. The gripper then 
+//closes in two motions first moving to the 400 servo position and then the 800 servo position. Between each movement the msleep function
+// allows the servo the time to reach its next position. Before the last movement the servos for the left and right motor are activated to allow the robot
+// to drive slightly forward to pick up the object. Once the object is secured and the pick up motion is complete the servos are disabled 
+// once again.
+
+/******************************************************/
+/******************************************************/
+void put_down(){
+	printf("Dropping\n");
+	drive(0.0, 0.0, 0.5);
+	enable_servo(GRIPPER_MOTOR);
+	set_servo_position(GRIPPER_MOTOR, 800);
+	msleep(500);
+	disable_servos();
+	enable_servo(GRIPPER_MOTOR);
+	set_servo_position(GRIPPER_MOTOR,400);
+	msleep(200);
+	enable_servo(LEFT_MOTOR);
+	enable_servo(RIGHT_MOTOR);
+	drive(-0.5,-0.5,2);
+	set_servo_position(GRIPPER_MOTOR,0);
+	msleep(200);
+	disable_servos();
+
+}
+// The put_down_method enables the servo connected to the gripper motor and sets the servo position to 800 which ensures the gripper is in the closed position. The gripper then 
+//opens in two motions first moving to the 400 servo position and then the 0 servo position. Between each movement the msleep function
+// allows the servo the time to reach its next position. Before the last movement the servos for the left and right motor are activated to allow the robot
+// to drive slightly forward to drop the object. Once the object is dropped and the put down motion is complete the servos are disabled 
+// once again.
+/******************************************************/
+void return_nest(){
+}
+// The return_nest method was orginally intended to allow the robot to return to the the "nest: where the pebbles should be placed by using
+// information from an IR beacon. Due to time constraints we were unable to implement this method.
+/******************************************************/
+void avoid(){
+	int left_ir_value;
+	int right_ir_value;
+	
+	left_ir_value = analog_et(LEFT_IR);
+	right_ir_value = analog_et(RIGHT_IR);
+	
+	if(left_ir_value > avoid_threshold){
+		drive(0.5, -0.5, 0.1);
+	}
+	
+	else if(right_ir_value > avoid_threshold){
+		drive(-0.5, 0.5, 0.1);
+	}
+}
+// The avoid method drives to the right if the if the left_ir_value exceeds the avoid threshold. If the right_ir_value exceeds the avoid threshold then the avoid function
+// will drive to the left.
+/******************************************************/
+void straight_cruise(){
+	drive(-0.40, -0.40, 0.5);
+}
+// The straight_cruise method calls the drive function and drives forward for a specified period of time
+/******************************************************/
+void stop(){
+	drive(0.0, 0.0, 0.25);
+}
+// The stop method calls the drive function and stops the robot for a specified period of time
+/******************************************************/
+void drive(float left, float right, float delay_seconds){
+	float left_speed;
+	float right_speed;
+	
+	delay_seconds *= 1000;
+	right_speed = TOP_SPEED - (right * TOP_SPEED);
+	left_speed  = TOP_SPEED + (left * TOP_SPEED);
+	
+	set_servo_position(LEFT_MOTOR, left_speed);
+	set_servo_position(RIGHT_MOTOR, right_speed);
+	msleep(delay_seconds);
+}
+// The drive method functions based on the the input of three seperate float values. The left and right input values determine the speed of the left
+// and right motors respectively. The delay_seconds value determines the length of the msleep function which instructs the robot how long to execute the drive function.
+/******************************************************/
